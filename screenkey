@@ -1,10 +1,7 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 # "screenkey" is distributed under GNU GPLv3+, WITHOUT ANY WARRANTY.
 # Copyright(c) 2010-2012: Pablo Seminario <pabluk@gmail.com>
-# Copyright(c) 2015-2016: wave++ "Yuri D'Elia" <wavexx@thregr.org>.
-
-from __future__ import print_function, unicode_literals
+# Copyright(c) 2015-2020: wave++ "Yuri D'Elia" <wavexx@thregr.org>.
 
 from Screenkey import *
 
@@ -14,21 +11,32 @@ import re
 from argparse import ArgumentParser
 
 
+def parse_geom_fract(buf):
+    if len(buf) == 0:
+        return 0
+    if buf[-1] == '%':
+        v = int(buf[:-1])
+        if v == 0:
+            return 0
+        return v / 100
+    return int(buf)
+
+
 def geometry(string):
-    size = re.match(r'^(\d+)x(\d+)(\+\d+\+\d+)?$', string)
+    size = re.match(r'^(\d+%?)x(\d+%?)(?:([+-]\d+%?)([+-]\d+%?))?$', string)
     if size is None:
         raise TypeError
-    wh = [int(size.group(1)), int(size.group(2))]
-    if size.group(3) is None:
-        xy = [0, 0]
-    else:
-        pos = re.match(r'^\+(\d+)\+(\d+)$', size.group(3))
-        xy = [int(pos.group(1)), int(pos.group(2))]
-    return xy + wh
+    w = parse_geom_fract(size.group(1))
+    h = parse_geom_fract(size.group(2))
+    if w == 0 or h == 0:
+        raise TypeError
+    x = parse_geom_fract(size.group(3)) if size.group(3) else 0
+    y = parse_geom_fract(size.group(4)) if size.group(4) else 0
+    return [x, y, w, h]
 
 
 def main():
-    ap = ArgumentParser(description=APP_DESC, version=VERSION)
+    ap = ArgumentParser(description=APP_DESC)
     ap.add_argument("-d", "--debug", action="store_true",
                     help=_("enable debugging"))
     ap.add_argument("--no-systray", action="store_true",
@@ -38,6 +46,8 @@ def main():
                     help=_("set vertical position"))
     ap.add_argument("--persist", action='store_true', default=None,
                     help=_("make window persistent"))
+    ap.add_argument("--window", action='store_true', default=None,
+                    help=_("use a regular window for display (implies --persist)"))
     ap.add_argument("-s", "--font-size", choices=FONT_SIZES,
                     help=_("set font size"))
     ap.add_argument("-g", "--geometry", type=geometry,
@@ -72,14 +82,24 @@ def main():
                     help=_("Ignore the specified KeySym"))
     ap.add_argument("--compr-cnt", type=int, metavar='COUNT',
                     help=_("Compress key repeats after the specified count"))
+    ap.add_argument("--start-disabled", action='store_true', default=None,
+                    help=_("do not display anything until explicitly requested"))
+    ap.add_argument('--version', action='version', version=VERSION,
+                    help=_("show version of screenkey"))
+    ap.add_argument("-M", "--mouse", action="store_true", default=None,
+                    help=_("show the mouse buttons"))
+    ap.add_argument("--mouse-fade", type=float, dest='button_hide_duration',
+                    help=_("Mouse buttons fade duration in seconds"))
     args = ap.parse_args()
 
     # Set options
     options = Options()
-    for arg in ['timeout', 'position', 'persist', 'font_desc', 'font_color', 'bg_color',
-                'font_size', 'geometry', 'key_mode', 'bak_mode', 'mods_mode', 'mods_only',
-                'multiline', 'vis_shift', 'vis_space', 'screen', 'no_systray',
-                'opacity', 'ignore', 'compr_cnt']:
+    for arg in ['timeout', 'position', 'persist', 'window', 'font_desc',
+                'font_color', 'bg_color', 'font_size', 'geometry',
+                'key_mode', 'bak_mode', 'mods_mode', 'mods_only',
+                'multiline', 'vis_shift', 'vis_space', 'screen',
+                'no_systray', 'opacity', 'ignore', 'compr_cnt',
+                'start_disabled', 'mouse', 'button_hide_duration']:
         if getattr(args, arg) is not None:
             options[arg] = getattr(args, arg)
 

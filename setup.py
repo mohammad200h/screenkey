@@ -1,7 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from setuptools import setup
+from distutils.command.build import build
 
-setup(name='screenkey', version='0.9',
+class BuildWithCompile(build):
+    sub_commands = [('compile_catalog', None)] + build.sub_commands
+
+setup(name='screenkey', version='1.5',
       description='A screencast tool to display keys',
 
       author='Pablo Seminario',
@@ -30,8 +34,18 @@ setup(name='screenkey', version='0.9',
 
       scripts=['screenkey'],
       packages=['Screenkey'],
-      setup_requires=['setuptools', 'python-distutils-extra'],
-      install_requires=['PyGTK', 'pycairo'],
-      data_files=[('share/applications', ['data/screenkey.desktop']),
-                  ('share/doc/screenkey', ['README.rst', 'NEWS.rst'])],
+      setup_requires=['setuptools', 'babel'],
+      install_requires=['PyGObject', 'pycairo', 'dbus-python'],
+      package_data={'': [
+          'images/mouse.svg',
+          'locale/*/LC_MESSAGES/screenkey.mo'
+      ]},
+      data_files=[
+          ('share/applications', ['data/screenkey.desktop']),
+          ('share/doc/screenkey', ['README.rst', 'NEWS.rst']),
+          ('share/metainfo', ['data/org.thregr.screenkey.metainfo.xml'])
+      ],
+      cmdclass={
+          'build': BuildWithCompile,
+      },
 )

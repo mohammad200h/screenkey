@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Distributed under the GNU GPLv3+ license, WITHOUT ANY WARRANTY.
 # Copyright(c) 2015: wave++ "Yuri D'Elia" <wavexx@thregr.org>
 #
@@ -31,8 +30,6 @@
 #
 # Drop me a line if you ever find this comment helpful, as finding a decent
 # solution was not trivial -- YD 21/08/2015.
-
-from __future__ import unicode_literals, absolute_import
 
 if __name__ == '__main__':
     import xlib
@@ -157,6 +154,12 @@ class KeyData():
         self.modifiers = modifiers
 
 
+class ButtonData():
+    def __init__(self, btn, pressed):
+        self.btn = btn
+        self.pressed = pressed == xlib.ButtonPress
+
+
 class InputType:
     keyboard = 0b001
     button   = 0b010
@@ -166,14 +169,15 @@ class InputType:
 
 
 class InputListener(threading.Thread):
-    def __init__(self, callback, input_types=InputType.all, kbd_compose=True, kbd_translate=True):
-        super(InputListener, self).__init__()
-        self.callback = callback
+    def __init__(self, event_callback, input_types=InputType.all,
+                 kbd_compose=True, kbd_translate=True):
+        super().__init__()
+        self.event_callback = event_callback
         self.input_types = input_types
         self.kbd_compose = kbd_compose
         self.kbd_translate = kbd_translate
         self.lock = threading.Lock()
-        self._stop = True
+        self.stopped = True
         self.error = None
 
 
@@ -192,11 +196,23 @@ class InputListener(threading.Thread):
 
 
     def _event_callback(self, data):
-        self.callback(data)
+        self.event_callback(data)
         return False
 
     def _event_processed(self, data):
+        
         data.symbol = xlib.XKeysymToString(data.keysym)
+        print("_event_processed::data.symbol:: ",data.symbol )
+
+        # if data.symbol ==  b'Shift_L':
+        #     data.symbol =  b'Shift'
+        # elif data.symbol ==  b'Control_L':
+        #     data.symbol =  b'Control'
+        # elif data.symbol ==  b'Alt_L':
+        #     data.symbol =  b'Alt'
+            
+            
+           
         if data.string is None:
             data.string = keysym_to_unicode(data.keysym)
         glib.idle_add(self._event_callback, data)
@@ -240,15 +256,15 @@ class InputListener(threading.Thread):
 
     def start(self):
         self.lock.acquire()
-        self._stop = False
+        self.stopped = False
         self.error = None
-        super(InputListener, self).start()
+        super().start()
 
 
     def stop(self):
         with self.lock:
-            if not self._stop:
-                self._stop = True
+            if not self.stopped:
+                self.stopped = True
                 xlib.XRecordDisableContext(self.control_dpy, self.record_ctx)
 
 
@@ -316,6 +332,12 @@ class InputListener(threading.Thread):
         self._kbd_last_ev = ev
 
 
+    def _btn_process(self, ev):
+        if ev.type in [xlib.ButtonPress, xlib.ButtonRelease]:
+            data = ButtonData(ev.xbutton.button, ev.type)
+            glib.idle_add(self._event_callback, data)
+
+
     def run(self):
         # control connection
         self.control_dpy = xlib.XOpenDisplay(None)
@@ -340,7 +362,7 @@ class InputListener(threading.Thread):
             # cheap wakeup() equivalent for compatibility
             glib.idle_add(self._event_callback, None)
 
-            self._stop = True
+            self.stopped = True
             self.lock.release()
             return
 
@@ -365,7 +387,7 @@ class InputListener(threading.Thread):
         self.lock.release()
         while True:
             with self.lock:
-                if self._stop:
+                if self.stopped:
                     break
 
             r_fd = []
@@ -387,6 +409,8 @@ class InputListener(threading.Thread):
                 xlib.XNextEvent(self.replay_dpy, xlib.byref(ev))
                 if self.input_types & InputType.keyboard:
                     self._kbd_process(ev)
+                if self.input_types & InputType.button:
+                    self._btn_process(ev)
 
         # finalize
         self.lock.acquire()
@@ -402,7 +426,7 @@ class InputListener(threading.Thread):
         xlib.XDestroyWindow(self.replay_dpy, self.replay_win)
         xlib.XCloseDisplay(self.replay_dpy)
 
-        self._stop = True
+        self.stopped = True
         self.lock.release()
 
 
@@ -415,7 +439,6 @@ if __name__ == '__main__':
             values[k] = getattr(data, k)
         print(values)
 
-    glib.threads_init()
     kl = InputListener(callback)
     try:
         # keep running only while the listener is alive

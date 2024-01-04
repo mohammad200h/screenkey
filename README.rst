@@ -19,10 +19,33 @@ This is an almost-complete rewrite of screenkey_ 0.2, featuring:
 - Switch for visible shift and modifier sequences only
 - Repeats compression
 - Countless bug fixes
+- Mouse buttons support
 
 
 Installation and basic usage
 ----------------------------
+
+Official packages
+~~~~~~~~~~~~~~~~~
+
+Arch: `Arch package <https://www.archlinux.org/packages/extra/any/screenkey/>`_
+  ``sudo pacman -S screenkey``
+
+Debian / Ubuntu: `Debian tracker <https://packages.debian.org/search?searchon=sourcenames&keywords=screenkey>`_
+  ``sudo apt-get install screenkey``
+
+Fedora / EPEL: `Fedora package <https://src.fedoraproject.org/rpms/screenkey>`_
+  ``sudo dnf install screenkey``
+
+Gentoo: `Gentoo package <https://packages.gentoo.org/packages/x11-misc/screenkey>`_
+  ``sudo emerge -av x11-misc/screenkey``
+
+Screenkey is available on `other distributions
+<https://repology.org/project/screenkey/versions>`_ too.
+
+
+From source
+~~~~~~~~~~~
 
 Execute without installation::
 
@@ -34,22 +57,31 @@ To install::
 
 Dependencies:
 
-- Python 2.7 (no Python 3 support yet)
-- PyGTK
-- Pycairo
-- setuptools (build only)
-- DistUtils-Extra (build only)
+- Python 3.x (Python 2.x is no longer supported)
+- PyGObject (python3-gi)
+- GTK 3 (via GI bindings)
+- Pycairo (python3-cairo)
+- Cairo GI bindings (python3-gi-cairo)
+- Python DBUS (python3-dbus)
+- setuptools (python3-setuptools, build only)
+- babel (python3-babel, build only)
 - slop (https://github.com/naelstrof/slop)
 - FontAwesome_ (for multimedia symbols)
-- Python AppIndicator (required for Unity / GNOME Shell)
+- GIR AyatanaAppIndicator3 (only required for Unity / GNOME Shell)
 
 Install dependencies (on Debian/Ubuntu)::
 
-  sudo apt-get install python-gtk2 python-setuptools python-distutils-extra
+  sudo apt-get install python3-gi gir1.2-gtk-3.0
+  sudo apt-get install python3-gi-cairo python3-cairo
+  sudo apt-get install python3-setuptools python3-babel
+  sudo apt-get install python3-dbus fonts-font-awesome slop
 
-You can also install "screenkey" via ArchLinux's AUR package:
+When using GNOME also install::
 
-https://aur.archlinux.org/packages/screenkey
+  sudo apt-get install gir1.2-ayatanaappindicator3-0.1
+
+Note: Screenkey makes use of low-level X11 functions directly via
+``libX11.so.6``.
 
 
 Settings
@@ -150,6 +182,13 @@ Compress repeats:
   requested threshold. A counter of total occurrences is shown instead,
   which is generally more legible.
 
+Show mouse:
+  When enabled, the mouse buttons are shown on the left of the output window.
+
+Hide duration:
+  Duration (in seconds) of the fade-out animation when a button is released.
+  Defaults to 1 second.
+
 
 Advanced usage
 --------------
@@ -211,6 +250,19 @@ selection::
 
   ./screenkey -p fixed -g $(slop -n -f '%g')
 
+X and Y coordinates can be negative and in such cases they refer to a
+distance from opposite side of the screen (+10 would be 10 pixels from
+the left side of the screen, while -10 being 10 pixels from the right).
+
+As an extension to the geometry format, all numbers can be written with
+a trailing % to refer as a percentage to the selected screen size. For
+example, the following::
+
+  ./screenkey -p fixed -g 90%x10%+5%-10%
+
+specifies an horizontally centered rectangle filling 90% of the width of
+screen at 10% from the bottom.
+
 
 Choosing a good font
 ~~~~~~~~~~~~~~~~~~~~
@@ -261,23 +313,14 @@ configuration.
 Related tools
 ~~~~~~~~~~~~~
 
-If you're recording a screencast where almost all editing is already
-visible (for example, in ``vi`` or most other text editors), consider
-using a bigger screen font instead, so that the viewer can read the text
-directly while the program is being used.
-
-If the control sequences you're typing are rare, you might even want to
-spell what you're doing instead of obscuring the screen with the typing
-output.
-
 When doing screencasts involving a lot of mouse activity, or which
 require holding down modifiers to perform other mouse actions, key-mon_
-might be a good companion to screenkey, or replace it entirely.
+(Python-based) or the newer kmcaster_ (Java-based) might be a good
+companion to screenkey, or replace it entirely.
 
-key-mon can be configured to show the state of key modifiers
-continuously and circle the location of mouse clicks ("visible click").
-key-mon and screenkey complete each-other and can be used at the same
-time.
+Both can be configured to show the state of key modifiers continuously
+and circle the location of mouse clicks ("visible click") and can be
+used together with screenkey.
 
 
 Troubleshooting
@@ -336,8 +379,10 @@ should be running. Check the output of::
   982 /usr/bin/ibus-daemon --xim
 
 ``ibus-daemon`` should be present and *must* include ``--xim`` in the
-command line. Likewise on a system using "fcitx" the following output
-has to be expected::
+command line. If not, the daemon must be restarted with it! Consult the
+documentation of your distribution for more information.
+
+On a system using "fcitx" the following output has to be expected::
 
   XMODIFIERS=@im=fcitx
   GTK_IM_MODULE=fcitx
@@ -351,9 +396,9 @@ In this case ``fcitx`` daemon should be running as well::
 If you see *any* mixture of the above, your system is likely to be
 incorrectly configured.
 
-If the "ibus" or "fcitx" package are not installed, there are no daemons
-running and the variables are mostly empty, try simply unsetting all of
-them before running Screenkey in a terminal::
+If the "ibus" or "fcitx" packages are not installed, there are no
+daemons running and the variables are mostly empty, then try simply
+unsetting all of them before running Screenkey in a terminal::
 
   unset XMODIFIERS
   unset GTK_IM_MODULES
@@ -361,13 +406,13 @@ them before running Screenkey in a terminal::
   screenkey
 
 If screenkey runs correctly after these changes, check your startup
-files such as ``~/.profile``, ``~/.bash_profile``,
-``~/.pam_environment`` files and remove the offending variables to make
-the change permanent. You must log-out and log-in in order to be able to
-run Screenkey normally after the change.
+files such as ``~/.profile``, ``~/.bash_profile`` or
+``~/.pam_environment`` and remove the offending variables to make the
+change permanent. You must log-out and log-in in order to be able to run
+Screenkey normally after the change.
 
 If you're running either ``ibus`` or ``fcitx`` but the variables contain
-mixed values, set them manually using::
+mixed values, try to reset them manually using::
 
   export XMODIFIERS=@im=ibus
   export GTK_IM_MODULE=ibus
@@ -375,12 +420,12 @@ mixed values, set them manually using::
   screenkey
 
 Again, if Screenkey works correctly after the change, inspect the
-content of your startup files to make the change permanent.
+contents of your startup files as above to make the change permanent.
 
-You should always check the documentation of your distribution for more
-details: the above guide is not meant to be exhaustive. There are other
-subtle ways to set the input method and daemon parameters. If all else
-fails, get in touch with the authors or file an issue on Github.
+You should always check the documentation of your distribution to see
+which input method *should* be running and how it should be configured.
+The above guide is not meant to be exhaustive. If nothing works, get in
+touch with the authors or file an issue on Gitlab to get more help.
 
 
 Cannot stop Screenkey or no status icon
@@ -390,10 +435,10 @@ You can exit from Screenkey by right-clicking on it's status icon and
 selecting "Quit".
 
 If you're using GNOME/Unity and cannot see any status icon please make
-sure the ``python-appindicator`` package is installed. Run the following
-inside a terminal to install as required::
+sure the ``gir1.2-appindicator3-0.1`` package is installed. Run the
+following inside a terminal to install as required::
 
-  sudo apt-get install python-appindicator
+  sudo apt-get install gir1.2-appindicator3-0.1
 
 On any other desktop system Screenkey uses the regular system tray. If
 you don't have a systray or you cannot quit an existing Screenkey, use
@@ -405,14 +450,60 @@ The proper way to exit when running Screenkey from a terminal is simply
 by interrupting it with ``Ctrl+C``.
 
 
-No output when using GNOME Terminal in Wayland
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No output in GNOME Terminal
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Screenkey cannot currently capture any input directed to native Wayland
 programs such as the GNOME Terminal: only X11 programs are supported.
 
 If you need to record a terminal session you'll have to switch to
 another X11 terminal emulator such as xterm, urxvt, mlterm, ...
+
+
+Localization
+------------
+
+Adding a new language translation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+After cloning the source repository, initialize a fresh new localization
+as following::
+
+  ./setup.py extract_messages
+  ./setup.py init_catalog -l <locale>
+
+Where ``<locale>`` is the locale name such as ``de_DE``.
+
+The generated template is located in
+``Screenkey/locale/<locale>/LC_MESSAGES/screenkey.po`` and can be edited
+with a text editor or using a PO editing tool such as poedit_.
+
+.. _poedit: https://poedit.net/
+
+
+Updating an existing translation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To update a pre-exiting language translation, execute::
+
+  ./setup.py extract_messages
+  ./setup.py update_catalog -l <locale>
+
+then review the updated localization in
+``Screenkey/locale/<locale>/LC_MESSAGES/screenkey.po``.
+
+
+Testing a translation
+~~~~~~~~~~~~~~~~~~~~~
+
+Localization can be tested by compiling the language catalog and running
+``screenkey`` from the source directory::
+
+  ./setup.py compile_catalog -l <locale>
+  ./screenkey
+
+The catalog needs to be compiled every time the localization has been
+changed to reflect the newest changes.
 
 
 Authors and Copyright
@@ -422,30 +513,38 @@ Authors and Copyright
 
 | "screenkey" is distributed under GNU GPLv3+, WITHOUT ANY WARRANTY.
 | Copyright(c) 2010-2012: Pablo Seminario <pabluk@gmail.com>
-| Copyright(c) 2015-2016: wave++ "Yuri D'Elia" <wavexx@thregr.org>.
+| Copyright(c) 2015-2021: wave++ "Yuri D'Elia" <wavexx@thregr.org>
+| Copyright(c) 2019-2020: Yuto Tokunaga <yuntan.sub1@gmail.com>
 
 screenkey's GIT repository is publicly accessible at:
 
-https://github.com/wavexx/screenkey
+https://gitlab.com/screenkey/screenkey
 
 
 Additional Thanks
 -----------------
 
+* @logix (gitlab)
+* @rhoit (github)
+* Alberto Fanjul
 * Benjamin Chrétien
 * Dmitry Bushev
 * Doug Patti
+* Farrer (launchpad)
+* Georges Khaznadar
 * Igor Bronovskyi
 * Ivan Makfinsky
 * Jacob Gardner
+* Matthew White
 * Muneeb Shaikh
+* Olivier Boesch
 * Stanislav Seletskiy
-* farrer (launchpad)
-* zhum (launchpad)
+* Zhum (launchpad)
+* Ziad El Khoury Hanna
 * 伊冲
-
 
 .. _Screenflick: http://www.araelium.com/screenflick/
 .. _key-mon: https://code.google.com/p/key-mon/
+.. _kmcaster: https://github.com/DaveJarvis/kmcaster/
 .. _screenkey: https://launchpad.net/screenkey
 .. _slop: https://github.com/naelstrof/slop
