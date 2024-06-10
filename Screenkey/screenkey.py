@@ -268,11 +268,16 @@ class Screenkey(Gtk.Window):
 
 
     def update_font(self):
+        # print("update_font::called")
         text = self.label.get_text()
         lines = text.count('\n') + 1
-        self.font.set_absolute_size((50 * self.height // lines // 100) * 1000)
+        # changed the font size from 50 to 20
+        self.font.set_absolute_size((20 * self.height // lines // 100) * 1000)
         self.label.set_padding(self.width // 100, 0)
         self.label.get_pango_context().set_font_description(self.font)
+
+        # Moving the text to buttom of screen so it is not distacting
+        self.label.set_valign(Gtk.Align.END)
 
 
     def update_image(self):

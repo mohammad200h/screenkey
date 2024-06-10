@@ -202,7 +202,7 @@ class InputListener(threading.Thread):
     def _event_processed(self, data):
         
         data.symbol = xlib.XKeysymToString(data.keysym)
-        print("_event_processed::data.symbol:: ",data.symbol )
+        # print("_event_processed::data.symbol:: ",data.symbol )
 
         # if data.symbol ==  b'Shift_L':
         #     data.symbol =  b'Shift'
